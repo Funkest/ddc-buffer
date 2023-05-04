@@ -9,6 +9,7 @@ import {
   OnEventArguments,
 } from "https://deno.land/x/ddc_vim@v3.4.0/base/source.ts";
 import { basename } from "https://deno.land/std@0.181.0/path/mod.ts";
+import { BufferExtensions } from "./buffer.me.extensions.ts";
 
 export async function getFileSize(fname: string): Promise<number> {
   let file: Deno.FileInfo;
@@ -181,18 +182,21 @@ export class Source extends BaseSource<Params> {
       p.bufNameStyle = "full";
     }
     const tabBufnrs = (await fn.tabpagebuflist(denops) as number[]);
+    const currentBufnr = (await fn.bufnr(denops)).toString();
     const altbuf = await fn.bufnr(denops, "#");
 
-    return Object.values(this.buffers).filter((buffer) =>
-      !p.requireSameFiletype ||
-      (buffer.filetype == context.filetype) ||
-      tabBufnrs.includes(buffer.bufnr) ||
-      (p.fromAltBuf && (altbuf == buffer.bufnr))
-    ).map((buf) => {
+    return Object.values(this.buffers).filter((buffer) => {
+      if (p.onlyCurrentBuffer) {
+        return currentBufnr == buffer.bufnr; }
+      return !p.requireSameFiletype ||
+        (buffer.filetype == context.filetype) ||
+        tabBufnrs.includes(buffer.bufnr) ||
+        (p.fromAltBuf && (altbuf == buffer.bufnr))
+    }).map((buf) => {
       const menu = (p.bufNameStyle == "full")
         ? buf.bufname
         : (p.bufNameStyle == "basename")
-        ? basename(buf.bufname)
+        ? BufferExtensions.CreateLabel(basename(buf.bufname), buf.bufnr)
         : "";
       if (menu) {
         return buf.candidates.map((b) => ({
@@ -212,6 +216,7 @@ export class Source extends BaseSource<Params> {
       forceCollect: false,
       showBufName: false,
       bufNameStyle: "none",
+      onlyCurrentBuffer: false,
     };
   }
 }
